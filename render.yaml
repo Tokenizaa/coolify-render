@@ -1,0 +1,77 @@
+services:
+  # PostgreSQL
+  - type: web
+    name: coolify-postgres
+    env: docker
+    plan: starter
+    internal: true
+    dockerImage: postgres:15
+    envVars:
+      - key: POSTGRES_DB
+        value: coolify
+      - key: POSTGRES_USER
+        value: coolify
+      - key: POSTGRES_PASSWORD
+        value: sua_senha_forte
+    volumes:
+      - type: volume
+        name: postgres-data
+        mountPath: /var/lib/postgresql/data
+    ports:
+      - port: 5432
+
+  # Redis
+  - type: web
+    name: coolify-redis
+    env: docker
+    plan: starter
+    internal: true
+    dockerImage: redis:7
+    volumes:
+      - type: volume
+        name: redis-data
+        mountPath: /data
+    ports:
+      - port: 6379
+
+  # Coolify
+  - type: web
+    name: coolify-app
+    env: docker
+    plan: starter
+    dockerImage: sua-imagem-coolify:latest  # substitua pela sua imagem
+    dockerCommand: |
+      sh -c "
+        echo 'Aguardando Postgres...'
+        until pg_isready -h coolify-postgres -p 5432; do sleep 2; done;
+        echo 'Executando migrations e seeds...'
+        php artisan migrate --force
+        php artisan db:seed --force
+        echo 'Iniciando Coolify...'
+        php artisan serve --host=0.0.0.0 --port=8080
+      "
+    envVars:
+      - key: DATABASE_HOST
+        value: coolify-postgres
+      - key: DATABASE_NAME
+        value: coolify
+      - key: DATABASE_USER
+        value: coolify
+      - key: DATABASE_PASSWORD
+        value: sua_senha_forte
+      - key: REDIS_HOST
+        value: coolify-redis
+      - key: REDIS_PORT
+        value: "6379"
+      - key: APP_ENV
+        value: production
+    ports:
+      - port: 8080
+    healthCheckPath: /health
+    autoDeploy: true
+
+volumes:
+  - name: postgres-data
+    plan: starter
+  - name: redis-data
+    plan: starter
